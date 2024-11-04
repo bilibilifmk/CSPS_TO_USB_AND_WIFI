@@ -1,7 +1,7 @@
 # CSPS_TO_USB_AND_WIFI
 CSPS_TO_USB_AND_WIFI
 * 视频：
-* 模型工程：
+* 模型工程：https://makerworld.com/zh/models/757748
 * PCB工程：https://oshwhub.com/hbk444/csps-dian-yuan-qu-dong-ban-_2024-10-28_16-25-34
 # 序
 * 本项目主要是为满足个人需求而设计，未必适合所有人。
