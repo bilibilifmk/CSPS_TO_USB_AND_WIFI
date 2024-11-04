@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>电源功率显示</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        background: linear-gradient(135deg, #d9a1b3, #e7bac6, #f3d3db);
+        color: #333;
+    }
+    .container {
+        position: relative;
+        width: 90%;
+        max-width: 500px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 15px;
+        padding: 20px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        text-align: center;
+    }
+    .settings-button {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background-color: #d98a9f;
+        color: #fff;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+    h1 {
+        font-size: 2em;
+        margin-bottom: 10px;
+        color: #d98a9f;
+    }
+    .data {
+        font-size: 1.2em;
+        margin: 10px 0;
+        color: #444;
+    }
+    .unsupported {
+        color: #b07585;
+    }
+    .fade-in {
+        opacity: 0;
+        animation: fadeIn 1.5s forwards;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    /* Modal styles */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        overflow-y: auto; /* Enable scrolling if content is larger than the viewport */
+    }
+    .modal-content {
+        background-color: #fff;
+        margin: 10% auto;
+        padding: 20px;
+        border-radius: 10px;
+        width: 90%;
+        max-width: 400px;
+    }
+    .close-btn {
+        float: right;
+        font-size: 24px;
+        font-weight: bold;
+        color: #333;
+        cursor: pointer;
+    }
+    .modal-content h2 {
+        color: #d98a9f;
+    }
+    .input-group {
+        margin: 10px 0;
+        text-align: left;
+    }
+    .input-group label {
+        display: block;
+        margin-bottom: 5px;
+    }
+    .input-group input[type="text"], .input-group input[type="number"] {
+        width: 100%;
+        padding: 8px;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+    }
+    .submit-btn {
+        background-color: #d98a9f;
+        color: #fff;
+        padding: 10px 15px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        width: 100%;
+        margin-top: 10px;
+    }
+    /* Toggle Switch */
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 60px;
+        height: 34px;
+    }
+    .switch input { display: none; }
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background-color: #ccc;
+        transition: .4s;
+        border-radius: 34px;
+    }
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 26px;
+        width: 26px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+    }
+    input:checked + .slider {
+        background-color: #d98a9f;
+    }
+    input:checked + .slider:before {
+        transform: translateX(26px);
+    }
+</style>
+</head>
+<body>
+
+<div class="container fade-in">
+    <button class="settings-button" onclick="openModal()">设置</button>
+    <h1>CSPS电源控制器</h1>
+    <div id="status" class="data">CSPS状态: <span>-</span></div>
+    <div id="inVoltage" class="data">输入电压: <span>-</span> V</div>
+    <div id="inCurrent" class="data">输入电流: <span>-</span> A</div>
+    <div id="inPower" class="data">输入功率: <span>-</span> W</div>
+    <div id="outVoltage" class="data">输出电压: <span>-</span> V</div>
+    <div id="outCurrent" class="data">输出电流: <span>-</span> A</div>
+    <div id="outPower" class="data">输出功率: <span>-</span> W</div>
+    <div id="temperature0" class="data">温度0: <span>-</span> °C</div>
+    <div id="temperature1" class="data">温度1: <span>-</span> °C</div>
+    <div id="fanSpeed" class="data">风扇速度: <span>-</span> RPM</div>
+    <div id="time" class="data">运行时间: <span>-</span> s</div>
+    <div id="oem" class="data">生产商: <span>-</span> </div>
+    <div id="pn" class="data">设备型号: <span>-</span> </div>
+</div>
+
+<!-- Modal Structure -->
+<div id="settingsModal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="closeModal()">&times;</span>
+        <h2>设置</h2>
+        
+        <!-- 通信密钥设置 -->
+        <div class="input-group">
+            <label for="commKey">通信密钥</label>
+            <input type="text" id="commKey" placeholder="请输入通信密钥默认 123">
+            <button class="submit-btn" onclick="saveCommKey()">保存到Cookie</button>
+        </div>
+        
+        <!-- 电源开关设置 -->
+        <div class="input-group">
+            <label>电源状态</label>
+            <label class="switch">
+                <input type="checkbox" id="powerState" onclick="togglePowerState()">
+                <span class="slider"></span>
+            </label>
+        </div>
+        
+        <!-- 风扇转速设置 -->
+        <div class="input-group">
+            <label for="fanSpeed">风扇转速 (RPM - 设置会保存在EEPROM)</label>
+            <input type="number" id="fanSpeedInput" placeholder="设置风扇转速">
+            <button class="submit-btn" onclick="updateFanSpeed()">设置风扇转速</button>
+        </div>
+
+        <!-- 插入电源时动作设置 -->
+        <div class="input-group">
+            <label>插入电源时动作 （设置会保存在EEPROM）</label>
+            <label><input type="radio" name="powerAction" value="on"> 开启</label>
+            <label><input type="radio" name="powerAction" value="off"> 关闭</label>
+            <button class="submit-btn" onclick="updatePowerAction()">设置插入电源动作</button>
+        </div>
+        <div class="input-group">
+            <button class="submit-btn" onclick="OTA_MODE()">进入OTA模式</button>
+        </div>
+        <!-- 修改通信密钥 -->
+        <div class="input-group">
+            <label for="N_commKey">新通信密钥</label>
+            <input type="text" id="N_commKey" placeholder="请输入新的通信密钥">
+            <button class="submit-btn" onclick="updateCommKey()">保存新密钥</button>
+        </div>
+        <div class="input-group">
+            <label for="0">项目地址github.com/bilibilifmk/CSPS_TO_USB_AND_WIFI</label>
+        </div>
+    </div>
+
+</div>
+</div>
+
+<script>
+
+async function fetchPowerData() {
+        try {
+            const response = await fetch('/CSPS_INFO?ID=Power');
+            const data = await response.json();
+
+            if (data.ID === "Power") {
+                document.getElementById("status").querySelector("span").textContent = data.Powe_STATE ? "开启" : "关闭";
+                document.getElementById("inVoltage").querySelector("span").textContent = data.IN_Voltage !== -1 ? data.IN_Voltage.toFixed(2) : "--";
+                document.getElementById("inCurrent").querySelector("span").textContent = data.IN_Current !== -1 ? data.IN_Current.toFixed(2) : "--";
+                document.getElementById("inPower").querySelector("span").textContent = data.IN_Power !== -1 ? data.IN_Power.toFixed(2) : "--";
+                document.getElementById("outVoltage").querySelector("span").textContent = data.OUT_Voltage !== -1 ? data.OUT_Voltage.toFixed(2) : "--";
+                document.getElementById("outCurrent").querySelector("span").textContent = data.OUT_Current !== -1 ? data.OUT_Current.toFixed(2) : "--";
+                document.getElementById("outPower").querySelector("span").textContent = data.OUT_Power !== -1 ? data.OUT_Power.toFixed(2) : "--";
+                document.getElementById("temperature0").querySelector("span").textContent = data.Temp0 !== -1 ? data.Temp0.toFixed(2) : "--";
+                document.getElementById("temperature1").querySelector("span").textContent = data.Temp1 !== -1 ? data.Temp1.toFixed(2) : "--";
+                document.getElementById("fanSpeed").querySelector("span").textContent = data.Fan !== -1 ? data.Fan : "--";
+                document.getElementById("time").querySelector("span").textContent = data.Time !== -1 ? data.Time.toFixed(2) : "--";
+            }
+            else if(data.ID === "ERROR")
+            {
+                document.getElementById("status").querySelector("span").textContent = data.MSG;
+                document.getElementById("inVoltage").querySelector("span").textContent = data.MSG;
+                document.getElementById("inCurrent").querySelector("span").textContent = data.MSG;
+                document.getElementById("inPower").querySelector("span").textContent = data.MSG;
+                document.getElementById("outVoltage").querySelector("span").textContent =data.MSG;
+                document.getElementById("outCurrent").querySelector("span").textContent = data.MSG;
+                document.getElementById("outPower").querySelector("span").textContent = data.MSG;
+                document.getElementById("temperature0").querySelector("span").textContent = data.MSG;
+                document.getElementById("temperature1").querySelector("span").textContent = data.MSG;
+                document.getElementById("fanSpeed").querySelector("span").textContent = data.MSG;
+                document.getElementById("time").querySelector("span").textContent = data.MSG;
+            
+            }
+        } catch (error) {
+            console.error("Error fetching power data:", error);
+        }
+    }
+    function startFetchingData() {
+        fetchPowerData();
+      
+        setInterval(() => {
+            fetchPowerData();
+          
+        }, 500); // 每0.5秒刷新一次
+    }
+    document.addEventListener("DOMContentLoaded", startFetchingData);
+
+    async function fetchInfoData() {
+        try {
+            const response = await fetch('/CSPS_INFO?ID=INFO');
+            const data = await response.json();
+
+            if (data.ID === "INFO") {
+                document.getElementById("oem").querySelector("span").textContent = data.OEM !== -1 ? data.OEM : "--";
+                document.getElementById("pn").querySelector("span").textContent = data.PN !== -1 ? data.PN : "--";
+            }else if(data.ID === "ERROR")
+            {
+                document.getElementById("oem").querySelector("span").textContent =  data.MSG;
+                document.getElementById("pn").querySelector("span").textContent =  data.MSG;
+            }
+        } catch (error) {
+            console.error("Error fetching info data:", error);
+        }
+    }
+
+    // 保存通信密钥到 Cookie
+    function saveCommKey() {
+        const commKey = document.getElementById("commKey").value;
+        document.cookie = `commKey=${commKey}; path=/;`;
+        alert(`通信密钥已保存到 Cookie: ${commKey}`);
+        validateCommKey();
+    }
+
+    // 更新新的通信密钥到 Cookie
+    async function updateCommKey() {
+        const buf = await validateCommKey();
+        if (getCommKeyFromCookie != "")
+        {
+        const newCommKey = document.getElementById("N_commKey").value;
+        document.cookie = `commKey=${newCommKey}; path=/;`;
+        console.log(`新的通信密钥已保存到 Cookie: ${newCommKey}`);
+        if (buf != "")
+        {
+            fetch(`/updateCommKey?random_CommKey=${buf}&newCommKey=${newCommKey}`, {
+            method: "GET"
+        })
+        }
+        document.getElementById("commKey").value = newCommKey;
+        }
+    }
+
+
+    // 获取 Cookie 中的通信密钥
+    function getCommKeyFromCookie() {
+        const cookies = document.cookie.split("; ");
+        for (let cookie of cookies) {
+            const [name, value] = cookie.split("=");
+            if (name === "commKey") return value;
+        }
+        return "";
+    }
+
+    // 验证通信密钥是否有效
+    async function validateCommKey() {
+    const commKey = getCommKeyFromCookie();
+    if (commKey) {
+        try {
+            const response = await fetch(`/Key_verification?commKey=${commKey}`);
+            const data = await response.json();
+
+            if (data.error === "Password_error") {
+                // 密钥错误，清除 Cookie
+                alert("通信密钥无效，已清除 Cookie。");
+                document.cookie = "commKey=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+                return ""; // 返回空字符串表示无效
+            } else if (data.random_CommKey) {
+                // 返回新的通信密钥，输出并返回
+                console.log(`随机通信密钥: ${data.random_CommKey}`);
+                return data.random_CommKey;
+            }
+        } catch (err) {
+            console.error("验证失败:", err);
+            return ""; // 返回空字符串表示验证失败
+        }
+    }
+    // return ""; // 没有 commKey 时返回空字符串
+    }
+
+    // 加载时填充通信密钥
+    document.addEventListener("DOMContentLoaded", () => {
+        GO_OTA_MODE();//进入ota模式
+        const commKey = getCommKeyFromCookie();
+        document.getElementById("commKey").value = commKey;
+        validateCommKey();
+        fetchInfoData();
+    });
+
+
+    // 从 Cookie 中获取通信密钥
+function getCommKeyFromCookie() {
+    const cookies = document.cookie.split("; ");
+    for (let cookie of cookies) {
+        const [name, value] = cookie.split("=");
+        if (name === "commKey") return value;
+    }
+    return "";
+}
+
+    // 打开模态框
+    function openModal() {
+        document.getElementById("settingsModal").style.display = "block";
+    }
+
+    // 关闭模态框
+    function closeModal() {
+        document.getElementById("settingsModal").style.display = "none";
+    }
+
+    // 设置风扇转速
+    async function updateFanSpeed() {
+        const fanSpeed = document.getElementById("fanSpeedInput").value;
+        console.log(`风扇转速已设置为: ${fanSpeed} RPM`);
+        const buf = await validateCommKey();
+        if (buf != "")
+        {
+            fetch(`/CSPS_INFO?ID=SET_FAN&SET_FAN=${fanSpeed}&random_CommKey=${buf}`, {
+            method: "GET"
+        });
+        }
+    }
+    
+    
+    async function togglePowerState() {
+    // 获取开关的当前状态
+    const powerStateCheckbox = document.getElementById("powerState");
+    const isPowerOn = powerStateCheckbox.checked;
+    const buf = await validateCommKey();
+
+    // 执行相应的逻辑
+    if (isPowerOn) {
+        console.log("电源已开启");
+        if (buf != "")
+        {
+            fetch(`/CSPS_INFO?ID=Power_SET&Power_SET=1&random_CommKey=${buf}`, {
+            method: "GET"
+        })
+        }
+    } else {
+        console.log("电源已关闭");
+        if (buf != "")
+        {
+            fetch(`/CSPS_INFO?ID=Power_SET&Power_SET=0&random_CommKey=${buf}`, {
+            method: "GET"
+        })
+        }
+    }
+    }
+    // 设置插入电源时动作
+    async function updatePowerAction() {
+        const powerAction = document.querySelector('input[name="powerAction"]:checked').value;
+        const buf = await validateCommKey();
+        console.log(`插入电源时动作已设置为: ${powerAction === 'on' ? '开启' : '关闭'}`);
+        var buf_set = 0;
+        if(powerAction === 'on')
+        {
+            buf_set = 1;
+        }
+        fetch(`/CSPS_INFO?ID=SET_AC_ON&SET_AC_ON=${buf_set}&random_CommKey=${buf}`, {
+            method: "GET"
+        });
+        
+    }
+    async function OTA_MODE() {
+        const buf = await validateCommKey();
+        console.log(`进入OTA模式`);
+       
+        fetch(`/ota_mode?random_CommKey=${buf}`, {
+            method: "GET"
+        });
+        alert("设备重启后将进入OTA模式 升级完成自动重启 误进入重启后推出OTA模式");
+        location.reload();
+    }
+    async function GO_OTA_MODE() {
+        console.log(`跳转OTA`);
+       
+        // fetch(`/ota_mode`, {
+        //     method: "GET"
+        // });
+        // alert("设备重启后将进入OTA模式 升级完成自动重启 误进入重启后推出OTA模式");
+        // location.reload();
+
+        const response = await fetch('/ota_mode');
+        const data = await response.json();
+        if (data.OTA_MODE_STATE === "1")
+        {
+            window.location.replace("/ota");
+        }
+    }
+    
+</script>
+
+</body>
+</html>
